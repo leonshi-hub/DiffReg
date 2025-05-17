@@ -1,0 +1,45 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# VSCode settings
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.venv/
+env/
+venv/
+
+# Log and output files
+*.log
+*.out
+*.err
+
+# Model checkpoints and results
+log/
+checkpoints/
+*.pth
+*.pt
+
+# Data
+*.npz
+*.npy
+*.h5
+*.csv
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Ignore liver dataset path if present
+/mnt/cluster/workspaces/pfeiffemi/V2SData/

@@ -61,7 +61,8 @@ class LiverDataset(Dataset):
 
     def _load_sample(self, folder_path):
         preop = read_vtk_points(os.path.join(folder_path, "liver_volume_f0.vtk"))        # [N, 3]
-        introp = read_vtk_points(os.path.join(folder_path, "liver_surface_partial_noisy_f1.vtp"))
+       # introp = read_vtk_points(os.path.join(folder_path, "liver_surface_partial_noisy_f1.vtp"))
+        introp = read_vtk_points(os.path.join(folder_path, "liver_volume_f1.vtk"))
         target = read_vtk_points(os.path.join(folder_path, "liver_volume_f1.vtk"))
 
         if preop.shape != target.shape:

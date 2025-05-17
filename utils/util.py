@@ -320,7 +320,8 @@ def save_pc2visual(save_dir, epoch, point_set1, point_set2, warped):
     save_path = os.path.join(save_dir, str(epoch) + 'epoch_' + id)
     os.mkdir(save_path)
     l = point_set1.size()[0]
-    point_set1, point_set2, warped = point_set1.cpu().numpy(), point_set2.cpu().numpy(), warped.cpu().numpy()
+   # point_set1, point_set2, warped = point_set1.cpu().numpy(), point_set2.cpu().numpy(), warped.cpu().numpy()
+    point_set1, point_set2, warped = point_set1.numpy(), point_set2.numpy(), warped.numpy()
     for i in range(l):
         np.savetxt(os.path.join(save_path, str(i) + "pc1.txt"), point_set1[i])
         np.savetxt(os.path.join(save_path, str(i) + "pc2.txt"), point_set2[i])
@@ -364,45 +365,42 @@ def save_pc2visual(save_dir, epoch, point_set1, point_set2, warped):
 
 
 
-def tps3d(old_ctl :torch.Tensor,new_ctl:torch.Tensor,source:torch.Tensor)->torch.Tensor:
-    """
-    ues tps3d to warp source point cloud
-    :param old_ctl: old control points coordinates  [27,C]
-    :param new_ctl: new control points coordinates  [27,C]
-    :param source: source point cloud need to be warpped  [N,C]
-    :return: warpped point cloud
-    """
-    # epsilon=1e-320
-    npnts,C=old_ctl.size()
-    K=torch.zeros([npnts,npnts])
-    for rr in range(npnts):
-        for cc in range(npnts):
-            K[rr,cc]=torch.sum((old_ctl[rr,:]-old_ctl[cc,:])**2)
-            K[cc,rr]=K[rr,cc]
+def tps3d(rigid_3d, new_ctl, points):
+    device = new_ctl.device
+    rigid_3d = rigid_3d.to(device)
+    points = points.to(device)
+    npnts = rigid_3d.shape[0]
+    nctl = new_ctl.shape[0]
 
-    K=torch.maximum(K,torch.zeros_like(K)+1e-32)
-    K=torch.sqrt(K)
-    P=torch.cat([torch.ones((npnts,1)),old_ctl],-1)
-    L=torch.cat(
-        [torch.cat([K,P],dim=-1),
-        torch.cat([P.T,torch.zeros((4,4))],dim=-1)]
-    ,dim=0)
-    param=torch.pinverse(L) @ torch.cat([new_ctl,torch.zeros((4,3))],dim=0)
+    # 新建张量都加 device=device
+    K = torch.zeros((npnts, nctl), device=device)
+    P = torch.cat([torch.ones((npnts, 1), device=device), rigid_3d], -1)
+    L = torch.cat([
+        torch.cat([K, P], dim=-1),
+        torch.cat([P.T, torch.zeros((4, 4), device=device)], dim=-1)
+    ], dim=0)
+    # 其它 torch.eye、torch.zeros、torch.ones 也都加 device=device
 
-    pntsNum=source.size()[0]
-    K=torch.zeros(pntsNum,npnts)
-    gx=source[:,0].reshape(-1,1)
-    gy=source[:,1].reshape(-1,1)
-    gz=source[:,2].reshape(-1,1)
-    # print(gx-old_ctl[0,0])    #[128,1]
-    for  kk in range(npnts):
-        K[:,[kk]]=((gx-old_ctl[kk,0])**2 + (gy-old_ctl[kk,1])**2 + (gz-old_ctl[kk,2])**2).float()
+    # ...后续代码...
 
-    K=torch.maximum(K,torch.zeros_like(K)+1e-32)
-    K=torch.sqrt(K)
+    param = torch.pinverse(L) @ torch.cat([new_ctl, torch.zeros((4, 3), device=device)], dim=0)
 
-    P=torch.cat([torch.ones((pntsNum,1)),gx,gy,gz],dim=-1)
-    L=torch.cat([K,P],dim=-1).float()
+    pntsNum = points.size()[0]
+    K = torch.zeros(pntsNum, npnts, device=device)  # 加 device
+    gx = points[:, 0].reshape(-1, 1)
+    gy = points[:, 1].reshape(-1, 1)
+    gz = points[:, 2].reshape(-1, 1)
+    for kk in range(npnts):
+        K[:, [kk]] = ((gx - rigid_3d[kk, 0]) ** 2 + (gy - rigid_3d[kk, 1]) ** 2 + (gz - rigid_3d[kk, 2]) ** 2).float()
+
+    K = torch.maximum(K, torch.zeros_like(K) + 1e-32)
+    K = torch.sqrt(K)
+
+    P = torch.cat([
+        torch.ones((pntsNum, 1), device=device),  # 加 device
+        gx, gy, gz
+    ], dim=-1)
+    L = torch.cat([K, P], dim=-1).float()
     return L @ param
 
 def gen_3d_std_rigid():

@@ -14,7 +14,7 @@ class get_model(nn.Module):
         self.fc3 = nn.Linear(162, 81)
         self.rigid_3d=gen_3d_std_rigid()
 
-    def forward(self, encoder_input: torch.Tensor, decoder_input: torch.Tensor)->(torch.Tensor,torch.Tensor):
+    def forward(self, encoder_input: torch.Tensor, decoder_input: torch.Tensor):#->(torch.Tensor,torch.Tensor):
         #### Do not need z_order any more
         # temp1, temp2 = Z_order_sorting.apply(encoder_input[:, :, :3], encoder_input[:, :, 3:6])
         # encoder_input = torch.cat([temp1, temp2], -1)
@@ -35,20 +35,23 @@ class get_model(nn.Module):
         warpped_feat = torch.nn.functional.leaky_relu(self.fc2(warpped_feat))
         new_ctl = self.fc3(warpped_feat)
         B,C,N=decoder_input.size()
-        new_ctl=torch.reshape(new_ctl,[B,27,3]).cpu()
-        decoder_input=decoder_input.cpu()
-        warped=torch.zeros([B,N,3])
+        new_ctl=torch.reshape(new_ctl,[B,27,3])#.cpu()
+        #decoder_input=decoder_input.cpu()
+        warped=torch.zeros([B,N,3], device=decoder_input.device)
         for aosidf in range(B):
             warped[aosidf]=tps3d(self.rigid_3d,new_ctl[aosidf],decoder_input[aosidf].permute(1,0))
 
-        loss1 = chamfer_loss(encoder_input[:, :3, :].cpu(), warped.permute(0,2,1), ps=N)
+       # loss1 = chamfer_loss(encoder_input[:, :3, :].cpu(), warped.permute(0,2,1), ps=N)
 
-        return warped.permute(0, 2, 1), loss1
+        return warped.permute(0, 2, 1)
+    
+
 
 
 if __name__ == '__main__':
     model = get_model(128, 3,512)
     a = torch.rand((2, 512, 3))
     b = torch.rand((2, 512, 3))
-    _,loss = model(a, b)
-    print(loss)
+    out = model(a, b)
+    print(out.shape)
+    

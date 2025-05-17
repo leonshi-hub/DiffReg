@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 from LiverDataset import LiverDataset
 from tqdm import tqdm
 
+from torch.nn import functional as F
+
 # === 固定参数（保留 transformer_3d_tps 的 flatten 接口）===
 MODEL_NAME = 'transformer_3d_tps'
 BATCH_SIZE = 2            # ⛳ 显存控制核心：小 batch 避免 flatten 炸
@@ -20,6 +22,8 @@ LOG_DIR = 'liver_flatten_safe'
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 
 os.environ["CUDA_VISIBLE_DEVICES"] = GPU
+
+
 
 def main():
     time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
@@ -55,13 +59,21 @@ def main():
         for batch in tqdm(loader, desc=f"[Epoch {epoch}]"):
             preop = batch['preop'].cuda().float()
             introp = batch['introp'].cuda().float()
-
+            gt_disp = batch['displacement'].cuda().float() #loss、
+            target = preop + gt_disp
+            target = target.permute(0, 2, 1).cuda()  # [B, 3, N]
             optimizer.zero_grad()
-            warped, loss = model(introp, preop)
-            loss.mean().backward()
+            warped = model(introp, preop)
+            #print('warped type:', type(warped))
+            #if isinstance(warped, tuple):
+               # print('warped tuple content:', [type(x) for x in warped])
+            # loss1 = chamfer_loss(encoder_input[:, :3, :].cpu(), warped.permute(0,2,1), ps=N)
+            loss = F.mse_loss(warped, target)
+            loss.backward()
             optimizer.step()
 
-            total_loss += loss.mean().item()
+            total_loss += loss.item()
+            #print(type(warped), isinstance(warped, torch.Tensor))
 
         avg_loss = total_loss / len(loader)
         log(f"[Epoch {epoch}] 平均 Loss: {avg_loss:.6f}")
