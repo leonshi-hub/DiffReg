@@ -31,7 +31,8 @@ checkpoints/
 *.npy
 *.h5
 *.csv
-
+*.ply
+*.pyc
 # OS files
 .DS_Store
 Thumbs.db

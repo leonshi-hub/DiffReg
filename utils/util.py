@@ -425,3 +425,13 @@ if __name__ == '__main__':
     xyz=torch.rand([4,32,3])
     torch_sum = torch.sum(xyz, dim=0)
     print(torch_sum.size())
+
+
+def get_timestep_embedding(timesteps, embedding_dim):
+    # 位置编码一样的实现
+    half_dim = embedding_dim // 2
+    emb = np.log(10000) / (half_dim - 1)
+    emb = torch.exp(torch.arange(half_dim) * -emb).to(timesteps.device)
+    emb = timesteps[:, None] * emb[None, :]
+    emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1)
+    return emb  # [B, D]

@@ -36,6 +36,7 @@ class get_model(nn.Module):
         new_ctl = self.fc3(warpped_feat)
         B,C,N=decoder_input.size()
         new_ctl=torch.reshape(new_ctl,[B,27,3])#.cpu()
+        print(f"new_ctl: min={new_ctl.min().item():.4f}, max={new_ctl.max().item():.4f}")
         #decoder_input=decoder_input.cpu()
         warped=torch.zeros([B,N,3], device=decoder_input.device)
         for aosidf in range(B):
@@ -54,4 +55,3 @@ if __name__ == '__main__':
     b = torch.rand((2, 512, 3))
     out = model(a, b)
     print(out.shape)
-    

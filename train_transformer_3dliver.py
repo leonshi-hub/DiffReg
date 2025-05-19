@@ -40,6 +40,9 @@ def main():
 
     log("✅ Step 1: 加载 liver 数据")
     dataset = LiverDataset(DATA_ROOT, num_points=NPOINT, preload=False)
+    # 只取前200个样本
+    from torch.utils.data import Subset
+    dataset = Subset(dataset, range(200))
     loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     log(f"总样本数：{len(dataset)}")
 
@@ -59,21 +62,24 @@ def main():
         for batch in tqdm(loader, desc=f"[Epoch {epoch}]"):
             preop = batch['preop'].cuda().float()
             introp = batch['introp'].cuda().float()
-            gt_disp = batch['displacement'].cuda().float() #loss、
+            gt_disp = batch['displacement'].cuda().float()
             target = preop + gt_disp
             target = target.permute(0, 2, 1).cuda()  # [B, 3, N]
+
+            # 打印数据范围
+            print(f"preop: min={preop.min().item():.4f}, max={preop.max().item():.4f}")
+            print(f"introp: min={introp.min().item():.4f}, max={introp.max().item():.4f}")
+            print(f"gt_disp: min={gt_disp.min().item():.4f}, max={gt_disp.max().item():.4f}")
+            print(f"target: min={target.min().item():.4f}, max={target.max().item():.4f}")
+
             optimizer.zero_grad()
             warped = model(introp, preop)
-            #print('warped type:', type(warped))
-            #if isinstance(warped, tuple):
-               # print('warped tuple content:', [type(x) for x in warped])
-            # loss1 = chamfer_loss(encoder_input[:, :3, :].cpu(), warped.permute(0,2,1), ps=N)
+            print(f"tps3d warped: min={warped.min().item():.4f}, max={warped.max().item():.4f}")
+
             loss = F.mse_loss(warped, target)
             loss.backward()
             optimizer.step()
-
             total_loss += loss.item()
-            #print(type(warped), isinstance(warped, torch.Tensor))
 
         avg_loss = total_loss / len(loader)
         log(f"[Epoch {epoch}] 平均 Loss: {avg_loss:.6f}")
