@@ -9,61 +9,73 @@ from utils.ddpm_schedule import DiffusionSchedule
 from utils.diffusion_utils import ddim_sample
 from LiverDataset import LiverDataset
 
-# === 设置 ===
-CHECKPOINT_PATH = '/home/shiliyuan/Projects/DiffReg/diffreg_pointnet_trans/log/liver_ddpm_experiment/2025-05-19_13-57-20/checkpoints/best_model.pth'
+import vtk
+from vtk.util.numpy_support import numpy_to_vtk
+from torch.utils.data import Subset
+
+# === 配置 ===
+CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-05-20_14-37-08/checkpoints/best_model.pth'
 SAVE_ROOT = './log/liver_ddpm_experiment/eval_vis'
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
 DDIM_STEPS = 50
-
+MAX_SAMPLES = 20  # 控制评估样本数量
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def save_txt_pointcloud(points, save_path):
-    """保存为 .txt 格式"""
-    np.savetxt(save_path, points, fmt='%.6f')
+def save_vtp_pointcloud(points: np.ndarray, save_path: str):
+    polydata = vtk.vtkPolyData()
+    vtk_points = vtk.vtkPoints()
+    vtk_points.SetData(numpy_to_vtk(points))
+    polydata.SetPoints(vtk_points)
+
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(save_path)
+    writer.SetInputData(polydata)
+    writer.Write()
 
 
 def visualize_batch(preop, introp, warped, folder_name, save_dir):
     os.makedirs(save_dir, exist_ok=True)
-    save_txt_pointcloud(preop[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_preop.txt"))
-    save_txt_pointcloud(introp[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_introp.txt"))
-    save_txt_pointcloud(warped[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_warped.txt"))
+    save_vtp_pointcloud(preop[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_preop.vtp"))
+    save_vtp_pointcloud(introp[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_introp.vtp"))
+    save_vtp_pointcloud(warped[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_warped.vtp"))
 
 
 @torch.no_grad()
 def main():
-    # === 加载模型 ===
     print("🚀 加载模型")
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS).to(DEVICE)
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
 
-    # === 加载数据 ===
-    dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
+    dataset_all = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
+    dataset = Subset(dataset_all, range(min(len(dataset_all), MAX_SAMPLES)))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
-
     diffusion = DiffusionSchedule(T=1000, device=DEVICE)
-
-    # === 可视化保存路径 ===
     Path(SAVE_ROOT).mkdir(parents=True, exist_ok=True)
 
-    # === 推理并保存 ===
-    print("🎨 开始采样与可视化")
+    print("🎨 开始采样与保存为 .vtp")
     for batch in tqdm(dataloader, desc="Evaluating"):
-        preop = batch['preop'].to(DEVICE).float()     # [1, N, 3]
+        preop = batch['preop'].to(DEVICE).float()
         introp = batch['introp'].to(DEVICE).float()
+        disp_mean = batch['disp_mean'].to(DEVICE).float()
+        disp_std = batch['disp_std'].to(DEVICE).float()
         folder_name = batch['folder'][0]
 
-        pred_disp = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
-        warped = preop + pred_disp
+        disp_mean = disp_mean.view(1, NUM_POINTS, 3)
+        disp_std = disp_std.view(1, NUM_POINTS, 3)
 
-        save_path = os.path.join(SAVE_ROOT, folder_name)
-        visualize_batch(preop, introp, warped, folder_name, save_path)
+        disp_pred = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
+        disp_pred = disp_pred * disp_std + disp_mean
+        warped = preop + disp_pred
 
-    print("✅ 所有点云保存完成，可在 ParaView 或 Open3D 中查看")
+        sample_dir = os.path.join(SAVE_ROOT, folder_name)
+        visualize_batch(preop, introp, warped, folder_name, sample_dir)
+
+    print("✅ 所有 .vtp 点云已保存，可使用 ParaView 查看结果。")
 
 
 if __name__ == '__main__':

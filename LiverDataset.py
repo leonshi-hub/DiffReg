@@ -12,7 +12,6 @@ def read_vtk_points(filename):
         reader = vtk.vtkXMLPolyDataReader()
     else:
         raise ValueError(f"Unsupported file type: {filename}")
-
     reader.SetFileName(filename)
     reader.Update()
     data = reader.GetOutput()
@@ -60,43 +59,48 @@ class LiverDataset(Dataset):
         return sample
 
     def _load_sample(self, folder_path):
-        preop = read_vtk_points(os.path.join(folder_path, "liver_volume_f0.vtk"))        # [N, 3]
-       # introp = read_vtk_points(os.path.join(folder_path, "liver_surface_partial_noisy_f1.vtp"))
+        preop = read_vtk_points(os.path.join(folder_path, "liver_volume_f0.vtk"))
         introp = read_vtk_points(os.path.join(folder_path, "liver_volume_f1.vtk"))
         target = read_vtk_points(os.path.join(folder_path, "liver_volume_f1.vtk"))
 
         if preop.shape != target.shape:
             raise ValueError(f"Mismatch in point count between f0 and f1 in {folder_path}")
 
-        displacement = target - preop  # [N, 3]
+        displacement = target - preop
 
-        preop = torch.from_numpy(preop)
-        introp = torch.from_numpy(introp)
-        displacement = torch.from_numpy(displacement)
+        # === 标准化 displacement ===
+        mean = displacement.mean(axis=0, keepdims=True)
+        std = displacement.std(axis=0, keepdims=True) + 1e-6
+        displacement_norm = (displacement - mean) / std
 
-        # 对 preop & displacement 做 FPS 或填充
-        if preop.shape[0] > self.num_points:
-            idx_fps = farthest_point_sample(preop, self.num_points)
-            preop = preop[idx_fps]
-            displacement = displacement[idx_fps]
-        elif preop.shape[0] < self.num_points:
-            pad_size = self.num_points - preop.shape[0]
-            pad_idx = torch.randint(0, preop.shape[0], (pad_size,), dtype=torch.long)
-            preop = torch.cat([preop, preop[pad_idx]], dim=0)
-            displacement = torch.cat([displacement, displacement[pad_idx]], dim=0)
+        # 转为 Tensor
+        preop = torch.from_numpy(preop).float()
+        introp = torch.from_numpy(introp).float()
+        displacement = torch.from_numpy(displacement_norm).float()
+        mean = torch.from_numpy(mean).float()
+        std = torch.from_numpy(std).float()
 
-        # 对 introp 做同样处理
-        if introp.shape[0] > self.num_points:
-            idx_fps = farthest_point_sample(introp, self.num_points)
-            introp = introp[idx_fps]
-        elif introp.shape[0] < self.num_points:
-            pad_size = self.num_points - introp.shape[0]
-            pad_idx = torch.randint(0, introp.shape[0], (pad_size,), dtype=torch.long)
-            introp = torch.cat([introp, introp[pad_idx]], dim=0)
+        # === 统一采样或填充为 num_points ===
+        def process_points(pc, n):
+            if pc.shape[0] > n:
+                idx = farthest_point_sample(pc, n)
+                return pc[idx]
+            elif pc.shape[0] < n:
+                pad_idx = torch.randint(0, pc.shape[0], (n - pc.shape[0],), dtype=torch.long)
+                return torch.cat([pc, pc[pad_idx]], dim=0)
+            return pc
+
+        preop = process_points(preop, self.num_points)
+        introp = process_points(introp, self.num_points)
+        displacement = process_points(displacement, self.num_points)
+        mean = mean.expand(self.num_points, 3)
+        std = std.expand(self.num_points, 3)
 
         return {
-            'preop': preop,  # encoder_input
-            'introp': introp,  # decoder_input
-            'displacement': displacement,
+            'preop': preop,                 # [N, 3]
+            'introp': introp,               # [N, 3]
+            'displacement': displacement,   # 标准化后 [N, 3]
+            'disp_mean': mean,              # [N, 3]
+            'disp_std': std,                # [N, 3]
             'folder': os.path.basename(folder_path)
         }

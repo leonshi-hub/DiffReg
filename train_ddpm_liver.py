@@ -11,7 +11,6 @@ from models.ddpm_displacement import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 
-
 # === 配置 ===
 LOG_NAME = 'liver_ddpm_experiment'
 BATCH_SIZE = 2
@@ -21,7 +20,6 @@ NUM_POINTS = 1024
 DIFFUSION_STEPS = 1000
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 def main():
     # === 创建日志路径 ===
@@ -38,9 +36,7 @@ def main():
         logging.info(msg)
 
     # === 加载数据集 ===
-    log("📦 加载 liver 数据...")
-    #dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
-    #dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+    log("\U0001F4E6 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
     dataset = Subset(dataset, range(200))  # 只取前200个样本
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
@@ -57,18 +53,18 @@ def main():
     for epoch in range(1, NUM_EPOCHS + 1):
         model.train()
         total_loss = 0
-        log(f"\n🔁 Epoch {epoch}/{NUM_EPOCHS}")
+        log(f"\n\U0001F501 Epoch {epoch}/{NUM_EPOCHS}")
 
         for batch in tqdm(dataloader, desc=f"[Epoch {epoch}]"):
-            preop = batch['preop'].to(DEVICE).float()        # [B, N, 3]
+            preop = batch['preop'].to(DEVICE).float()
             introp = batch['introp'].to(DEVICE).float()
             gt_disp = batch['displacement'].to(DEVICE).float()
+            disp_mean = batch['disp_mean'].to(DEVICE).float()
+            disp_std = batch['disp_std'].to(DEVICE).float()
 
-            # 随机 timestep t 和加噪
             t = torch.randint(0, diffusion.T, (BATCH_SIZE,), device=DEVICE).long()
-            x_t, eps = diffusion.add_noise(gt_disp, t)  # x_t: noisy disp, eps: true noise
+            x_t, eps = diffusion.add_noise(gt_disp, t)
 
-            # 获取 DDPM 预测函数（带条件）
             predict_eps_fn = model(preop, introp, t, return_noise=True)
             pred_eps = predict_eps_fn(x_t)
 
@@ -78,6 +74,11 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            # 仅打印第一个 batch 的分布情况
+            if epoch % 10 == 0 and batch['preop'].shape[0] > 0:
+                log(f"[Epoch {epoch}] pred_eps mean/std = {pred_eps.mean():.4f}, {pred_eps.std():.4f}")
+                log(f"[Epoch {epoch}] gt_disp mean/std = {gt_disp.mean():.4f}, {gt_disp.std():.4f}")
 
         avg_loss = total_loss / len(dataloader)
         log(f"[Epoch {epoch}] 平均 Loss: {avg_loss:.6f}")
