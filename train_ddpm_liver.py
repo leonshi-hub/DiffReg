@@ -13,11 +13,11 @@ from LiverDataset import LiverDataset
 
 # === 配置 ===
 LOG_NAME = 'liver_ddpm_experiment'
-BATCH_SIZE = 2
-NUM_EPOCHS = 60
+BATCH_SIZE = 3
+NUM_EPOCHS = 160
 LR = 1e-4
 NUM_POINTS = 1024
-DIFFUSION_STEPS = 1000
+DIFFUSION_STEPS = 300
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -38,7 +38,7 @@ def main():
     # === 加载数据集 ===
     log("\U0001F4E6 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
-    dataset = Subset(dataset, range(200))  # 只取前200个样本
+    dataset = Subset(dataset, range(5000))  # 只取前200个样本
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     log(f"数据样本数: {len(dataset)}")
 
