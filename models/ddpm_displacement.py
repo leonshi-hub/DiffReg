@@ -60,3 +60,23 @@ class TransformerDDPMRegNet(nn.Module):
             return lambda x_t: self.ddpm(x_t, t_embed, trans_feat)
         else:
             raise NotImplementedError("Use the training loop to predict x0 or sampling loop separately.")
+    def predict_noise_step(self, preop, introp, x_t, t):
+        """Predict noise for a given noisy displacement at timestep ``t``.
+
+        This helper recomputes PointNet+Transformer features every call so it can
+        be used in iterative feedback sampling where the preoperative point cloud
+        is updated at each step.
+        """
+        B, N, _ = preop.shape
+        x_input = preop.permute(0, 2, 1)
+        y_input = introp.permute(0, 2, 1)
+
+        feat_pre = self.encoder(x_input)
+        feat_int = self.encoder(y_input)
+        feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)
+
+        trans_feat = self.transformer(feat_pre, feat_int).permute(1, 0, 2)
+
+        t_embed = get_timestep_embedding(t, self.d_model).unsqueeze(1).expand(-1, N, -1)
+
+        return self.ddpm(x_t, t_embed, trans_feat)

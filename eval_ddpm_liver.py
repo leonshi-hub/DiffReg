@@ -14,7 +14,7 @@ from vtk.util.numpy_support import numpy_to_vtk
 from torch.utils.data import Subset
 
 # === 配置 ===
-CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-05-20_14-37-08/checkpoints/best_model.pth'
+CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-06-14_19-08-49/checkpoints/best_model.pth'
 SAVE_ROOT = './log/liver_ddpm_experiment/eval_vis'
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 BATCH_SIZE = 1
