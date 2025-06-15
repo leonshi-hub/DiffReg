@@ -26,9 +26,8 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
     # 2. 初始噪声
     x_t = torch.randn(B, N, 3, device=device)
 
-    # 3. 获取模型的条件函数
+
     model.eval()
-    predict_eps_fn = model(preop, introp, times[0].expand(B), return_noise=True)
 
     for i in tqdm(range(ddim_steps), desc="DDIM Sampling"):
         t = times[i].expand(B)  # 当前步
@@ -40,7 +39,7 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
         sqrt_alpha_bar_t = torch.sqrt(alpha_bar_t)
         sqrt_one_minus_alpha_bar_t = torch.sqrt(1. - alpha_bar_t)
 
-        eps_theta = predict_eps_fn(x_t)
+        eps_theta = model.predict_noise_step(preop, introp, x_t, t)
 
         # 4. 预测 x0（干净 displacement）
         x0_pred = (x_t - sqrt_one_minus_alpha_bar_t * eps_theta) / sqrt_alpha_bar_t
