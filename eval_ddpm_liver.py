@@ -6,7 +6,8 @@ from tqdm import tqdm
 
 from models.ddpm_displacement import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
-from utils.diffusion_utils import ddim_sample
+#from utils.diffusion_utils import ddim_sample
+from utils.diffusion_utils import ddim_sample_feedback
 from LiverDataset import LiverDataset
 
 import vtk
@@ -54,7 +55,7 @@ def main():
     dataset_all = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
     dataset = Subset(dataset_all, range(min(len(dataset_all), MAX_SAMPLES)))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
-    diffusion = DiffusionSchedule(T=1000, device=DEVICE)
+    diffusion = DiffusionSchedule(T=300, device=DEVICE)
     Path(SAVE_ROOT).mkdir(parents=True, exist_ok=True)
 
     print("🎨 开始采样与保存为 .vtp")
@@ -68,8 +69,11 @@ def main():
         disp_mean = disp_mean.view(1, NUM_POINTS, 3)
         disp_std = disp_std.view(1, NUM_POINTS, 3)
 
-        disp_pred = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
-        disp_pred = disp_pred * disp_std + disp_mean
+        #disp_pred = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
+        #disp_pred = disp_pred * disp_std + disp_mean
+        disp_pred = ddim_sample_feedback(
+            model, preop, introp, disp_mean, disp_std, diffusion, ddim_steps=DDIM_STEPS
+        )
         warped = preop + disp_pred
 
         sample_dir = os.path.join(SAVE_ROOT, folder_name)

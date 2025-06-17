@@ -34,6 +34,12 @@ class TransformerDDPMRegNet(nn.Module):
 
         self.npoint = npoint
         self.d_model = d_model
+        self.t_embed_proj = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.ReLU(),
+            nn.Dropout(0.1)
+ )
+
 
     def forward(self, preop, introp, t, return_noise=False):
         """
@@ -53,7 +59,10 @@ class TransformerDDPMRegNet(nn.Module):
         trans_feat = self.transformer(feat_pre, feat_int).permute(1, 0, 2)  # [B, N, d_model]
 
         # timestep embedding
-        t_embed = get_timestep_embedding(t, self.d_model).unsqueeze(1).expand(-1, N, -1)  # [B, N, d_model]
+        #t_embed = get_timestep_embedding(t, self.d_model).unsqueeze(1).expand(-1, N, -1)  # [B, N, d_model]
+        t_embed_raw = get_timestep_embedding(t, self.d_model)           # [B, d]
+        t_embed_proj = self.t_embed_proj(t_embed_raw)                   # [B, d]
+        t_embed = t_embed_proj.unsqueeze(1).expand(-1, N, -1)           # [B, N, d]
 
         # training: return noise; inference: return x0 (displacement)
         if return_noise:

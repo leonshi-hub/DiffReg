@@ -13,9 +13,9 @@ from LiverDataset import LiverDataset
 
 # === 配置 ===
 LOG_NAME = 'liver_ddpm_experiment'
-BATCH_SIZE = 3
-NUM_EPOCHS = 160
-LR = 1e-4
+BATCH_SIZE = 4
+NUM_EPOCHS = 300
+LR = 1e-3
 NUM_POINTS = 1024
 DIFFUSION_STEPS = 300
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
@@ -38,13 +38,14 @@ def main():
     # === 加载数据集 ===
     log("\U0001F4E6 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
-    dataset = Subset(dataset, range(5000))  # 只取前200个样本
+    dataset = Subset(dataset, range(5000))  # 只取前n个样本
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
     log(f"数据样本数: {len(dataset)}")
 
     # === 模型与优化器 ===
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS).to(DEVICE)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
     diffusion = DiffusionSchedule(T=DIFFUSION_STEPS, device=DEVICE)
 
     best_loss = float('inf')
@@ -82,6 +83,8 @@ def main():
 
         avg_loss = total_loss / len(dataloader)
         log(f"[Epoch {epoch}] 平均 Loss: {avg_loss:.6f}")
+        scheduler.step()
+        log(f"[Epoch {epoch}] 学习率: {optimizer.param_groups[0]['lr']:.6e}")
 
         # 保存最佳模型
         if avg_loss < best_loss:
