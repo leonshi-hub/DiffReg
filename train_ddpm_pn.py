@@ -8,13 +8,13 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import math
 
-from models.ddpm_displacement import TransformerDDPMRegNet
+from models.ddpm_pn import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 
 # === 配置 ===
 LOG_NAME = 'liver_ddpm_experiment'
-BATCH_SIZE = 5
+BATCH_SIZE = 4
 NUM_EPOCHS = 300
 LR = 1e-3
 NUM_POINTS = 1024
@@ -75,7 +75,7 @@ def main():
             t = torch.randint(0, diffusion.T, (BATCH_SIZE,), device=DEVICE).long()
             x_t, eps = diffusion.add_noise(gt_disp, t)
 
-            predict_eps_fn = model(preop, introp, t, return_noise=True)
+            predict_eps_fn = model(preop, introp, gt_disp, t, return_noise=True)
             pred_eps = predict_eps_fn(x_t)
 
             loss = F.mse_loss(pred_eps, eps)

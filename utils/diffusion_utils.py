@@ -26,7 +26,7 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
 
     # 2. 初始噪声
     x_t = torch.randn(B, N, 3, device=device)
-
+    disp_cur = torch.zeros_like(preop)
     # 3. 获取模型的条件函数
     model.eval()
     #predict_eps_fn = model(preop, introp, times[0].expand(B), return_noise=True)
@@ -42,7 +42,8 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
         sqrt_one_minus_alpha_bar_t = torch.sqrt(1. - alpha_bar_t)
 
         #eps_theta = predict_eps_fn(x_t)
-        eps_theta = model.predict_noise_step(preop, introp, x_t, t)
+        #eps_theta = model.predict_noise_step(preop, introp, x_t, t)
+        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t)
 
 
         # 4. 预测 x0（干净 displacement）
@@ -54,7 +55,7 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
         noise = torch.randn_like(x_t) if i < ddim_steps - 1 else torch.zeros_like(x_t)
 
         x_t = torch.sqrt(alpha_bar_next) * x0_pred + torch.sqrt(1 - alpha_bar_next - sigma ** 2) * eps_theta + sigma * noise
-
+        disp_cur = x0_pred
     return x0_pred  # 最终输出的 displacement field
 
 # @torch.no_grad()
@@ -148,7 +149,7 @@ def ddim_sample_feedback(model, preop, introp, disp_mean, disp_std, diffusion, d
     times = torch.linspace(T - 1, 0, ddim_steps, dtype=torch.long, device=device)
     x_t = torch.randn(B, N, 3, device=device)
 
-    preop_cur = preop.clone()
+    disp_cur = torch.zeros_like(preop)
 
     for i in tqdm(range(ddim_steps), desc="DDIM Feedback"):
         t = times[i].expand(B)
@@ -160,7 +161,7 @@ def ddim_sample_feedback(model, preop, introp, disp_mean, disp_std, diffusion, d
         sqrt_alpha_bar_t = torch.sqrt(alpha_bar_t)
         sqrt_one_minus_alpha_bar_t = torch.sqrt(1. - alpha_bar_t)
 
-        eps_theta = model.predict_noise_step(preop_cur, introp, x_t, t)
+        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t)
 
         x0_pred = (x_t - sqrt_one_minus_alpha_bar_t * eps_theta) / sqrt_alpha_bar_t
         x0_pred = torch.clamp(x0_pred, -1., 1.)
@@ -172,7 +173,7 @@ def ddim_sample_feedback(model, preop, introp, disp_mean, disp_std, diffusion, d
         x_t = torch.sqrt(alpha_bar_next) * x0_pred + torch.sqrt(1 - alpha_bar_next - sigma ** 2) * eps_theta + sigma * noise
 
         w = weight_fn(i + 1, ddim_steps)
-        preop_cur = preop + w * disp_step
+        disp_cur = w * disp_step
 
     disp_final = x0_pred * disp_std + disp_mean
     return disp_final
