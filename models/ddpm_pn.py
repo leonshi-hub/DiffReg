@@ -28,7 +28,10 @@ class DDPMDeformer(nn.Module):
 class TransformerDDPMRegNet(nn.Module):
     def __init__(self, d_model=128, npoint=1024):
         super().__init__()
-        self.encoder = PointNetEncoder(channel=3, d_model=d_model, use_disp=True)
+        
+        #self.encoder = PointNetEncoder(channel=3, d_model=d_model, use_disp=True)
+        self.encoder_pre = PointNetEncoder(channel=3, d_model=d_model, use_disp=True)
+        self.encoder_int = PointNetEncoder(channel=3, d_model=d_model, use_disp=False)
         self.transformer = nn.Transformer(d_model=d_model, num_encoder_layers=4, num_decoder_layers=4)
         self.ddpm = DDPMDeformer(cond_dim=d_model, time_dim=d_model)
 
@@ -54,8 +57,10 @@ class TransformerDDPMRegNet(nn.Module):
         y_input = introp.permute(0, 2, 1)        # [B, 3, N]
 
 
-        feat_pre = self.encoder(x_input, disp_input)  # [B, d_model, N]
-        feat_int = self.encoder(y_input)              # [B, d_model, N]
+        # feat_pre = self.encoder(x_input, disp_input)  # [B, d_model, N]
+        # feat_int = self.encoder(y_input)              # [B, d_model, N]
+        feat_pre = self.encoder_pre(x_input, disp_input)  # [B, d_model, N]
+        feat_int = self.encoder_int(y_input)              # [B, d_model, N]
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)  # [N, B, d]
 
         trans_feat = self.transformer(feat_pre, feat_int).permute(1, 0, 2)  # [B, N, d_model]
@@ -83,8 +88,10 @@ class TransformerDDPMRegNet(nn.Module):
         disp_input = disp.permute(0, 2, 1)
         y_input = introp.permute(0, 2, 1)
 
-        feat_pre = self.encoder(x_input, disp_input)
-        feat_int = self.encoder(y_input)
+        # feat_pre = self.encoder(x_input, disp_input)
+        # feat_int = self.encoder(y_input)
+        feat_pre = self.encoder_pre(x_input, disp_input)
+        feat_int = self.encoder_int(y_input)
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)
 
         trans_feat = self.transformer(feat_pre, feat_int).permute(1, 0, 2)

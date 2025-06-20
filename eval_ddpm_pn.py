@@ -4,8 +4,9 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from models.ddpm_displacement import TransformerDDPMRegNet
+from models.ddpm_pn import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
+#from utils.diffusion_utils import ddim_sample
 from utils.diffusion_utils import ddim_sample_feedback
 from LiverDataset import LiverDataset
 
@@ -23,6 +24,7 @@ DDIM_STEPS = 50
 MAX_SAMPLES = 20  # 控制评估样本数量
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def save_vtp_pointcloud(points: np.ndarray, save_path: str):
     polydata = vtk.vtkPolyData()
     vtk_points = vtk.vtkPoints()
@@ -34,16 +36,18 @@ def save_vtp_pointcloud(points: np.ndarray, save_path: str):
     writer.SetInputData(polydata)
     writer.Write()
 
+
 def visualize_batch(preop, introp, warped, folder_name, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     save_vtp_pointcloud(preop[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_preop.vtp"))
     save_vtp_pointcloud(introp[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_introp.vtp"))
     save_vtp_pointcloud(warped[0].cpu().numpy(), os.path.join(save_dir, f"{folder_name}_warped.vtp"))
 
+
 @torch.no_grad()
 def main():
     print("🚀 加载模型")
-    model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, point_feat_mode="concat_disp").to(DEVICE)
+    model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS).to(DEVICE)
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -56,15 +60,17 @@ def main():
 
     print("🎨 开始采样与保存为 .vtp")
     for batch in tqdm(dataloader, desc="Evaluating"):
-        preop = batch['preop'].to(DEVICE).float()                    # [B, N, 3]
-        introp = batch['introp'].to(DEVICE).float()                  # [B, N, 3]
-        disp_mean = batch['disp_mean'].to(DEVICE).float()           # [B, N, 3]
-        disp_std = batch['disp_std'].to(DEVICE).float()             # [B, N, 3]
+        preop = batch['preop'].to(DEVICE).float()
+        introp = batch['introp'].to(DEVICE).float()
+        disp_mean = batch['disp_mean'].to(DEVICE).float()
+        disp_std = batch['disp_std'].to(DEVICE).float()
         folder_name = batch['folder'][0]
 
         disp_mean = disp_mean.view(1, NUM_POINTS, 3)
         disp_std = disp_std.view(1, NUM_POINTS, 3)
 
+        #disp_pred = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
+        #disp_pred = disp_pred * disp_std + disp_mean
         disp_pred = ddim_sample_feedback(
             model, preop, introp, disp_mean, disp_std, diffusion, ddim_steps=DDIM_STEPS
         )
@@ -74,6 +80,7 @@ def main():
         visualize_batch(preop, introp, warped, folder_name, sample_dir)
 
     print("✅ 所有 .vtp 点云已保存，可使用 ParaView 查看结果。")
+
 
 if __name__ == '__main__':
     main()

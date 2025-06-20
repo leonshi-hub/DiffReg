@@ -14,7 +14,7 @@ from LiverDataset import LiverDataset
 
 # === 配置 ===
 LOG_NAME = 'liver_ddpm_experiment'
-BATCH_SIZE = 4
+BATCH_SIZE = 5
 NUM_EPOCHS = 300
 LR = 1e-3
 NUM_POINTS = 1024
