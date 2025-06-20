@@ -29,44 +29,54 @@ from torch.autograd import Variable
 #         return x
 
 class PointNetEncoder(nn.Module):
-    def __init__(self, channel=3, d_model=512, use_disp=False):
+    def __init__(self, channel=3, d_model=512, use_disp=False, use_pred_disp=False):
         super(PointNetEncoder, self).__init__()
         self.use_disp = use_disp
+        self.use_pred_disp = use_pred_disp
 
         self.conv1 = torch.nn.Conv1d(channel, 64, 1)
         self.bn1 = nn.BatchNorm1d(64)
 
+        conv2_in = 64
         if use_disp:
             self.conv1_disp = torch.nn.Conv1d(3, 64, 1)
             self.bn1_disp = nn.BatchNorm1d(64)
-            conv2_in = 128
-        else:
-            conv2_in = 64
+            conv2_in += 64
+        if use_pred_disp:
+            self.conv1_pred = torch.nn.Conv1d(3, 64, 1)
+            self.bn1_pred = nn.BatchNorm1d(64)
+            conv2_in += 64
 
         self.conv2 = torch.nn.Conv1d(conv2_in, 128, 1)
         self.conv3 = torch.nn.Conv1d(128, d_model, 1)
         self.bn2 = nn.BatchNorm1d(128)
         self.bn3 = nn.BatchNorm1d(d_model)
 
-    def forward(self, x, disp=None):
+    def forward(self, x, disp=None, pred_disp=None):
         """
         Args:
-            x:    [B, C, N] coordinate features.
-            disp: optional [B, 3, N] displacement features if ``use_disp``.
+            x:         [B, C, N] coordinate features.
+            disp:      optional [B, 3, N] ground truth displacement if ``use_disp``.
+            pred_disp: optional [B, 3, N] predicted displacement if ``use_pred_disp``.
 
         Returns:
             [B, d_model, N] encoded features.
         """
         feat_coord = F.leaky_relu(self.bn1(self.conv1(x)))
 
+        feats = [feat_coord]
         if self.use_disp:
             if disp is None:
                 raise ValueError("Displacement tensor required when use_disp=True")
             feat_disp = F.leaky_relu(self.bn1_disp(self.conv1_disp(disp)))
-            feat = torch.cat([feat_coord, feat_disp], dim=1)
-        else:
-            feat = feat_coord
+            feats.append(feat_disp)
+        if self.use_pred_disp:
+            if pred_disp is None:
+                raise ValueError("Predicted displacement required when use_pred_disp=True")
+            feat_pred = F.leaky_relu(self.bn1_pred(self.conv1_pred(pred_disp)))
+            feats.append(feat_pred)
 
+        feat = torch.cat(feats, dim=1)
         feat = F.leaky_relu(self.bn2(self.conv2(feat)))
         feat = self.bn3(self.conv3(feat))
         return feat

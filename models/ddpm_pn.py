@@ -26,11 +26,11 @@ class DDPMDeformer(nn.Module):
 
 
 class TransformerDDPMRegNet(nn.Module):
-    def __init__(self, d_model=128, npoint=1024):
+    def __init__(self, d_model=128, npoint=1024, use_pred_disp=False):
         super().__init__()
         
         #self.encoder = PointNetEncoder(channel=3, d_model=d_model, use_disp=True)
-        self.encoder_pre = PointNetEncoder(channel=3, d_model=d_model, use_disp=True)
+        self.encoder_pre = PointNetEncoder(channel=3, d_model=d_model, use_disp=True, use_pred_disp=use_pred_disp)
         self.encoder_int = PointNetEncoder(channel=3, d_model=d_model, use_disp=False)
         self.transformer = nn.Transformer(d_model=d_model, num_encoder_layers=4, num_decoder_layers=4)
         self.ddpm = DDPMDeformer(cond_dim=d_model, time_dim=d_model)
@@ -43,23 +43,25 @@ class TransformerDDPMRegNet(nn.Module):
         #     nn.Dropout(0.1))
 
 
-    def forward(self, preop, introp, disp, t, return_noise=False):
+    def forward(self, preop, introp, disp, t, pred_disp=None, return_noise=False):
         """
         preop:  [B, N, 3]
         introp: [B, N, 3]
-        disp:   [B, N, 3] displacement feature (gt or predicted)
+        disp:   [B, N, 3] ground truth displacement feature
+        pred_disp: optional [B, N, 3] predicted displacement
         t:      [B]  # timestep
         return_noise: if True, return predicted noise; else, return predicted displacement x0
         """
         B, N, _ = preop.shape
         x_input = preop.permute(0, 2, 1)         # [B, 3, N]
         disp_input = disp.permute(0, 2, 1)       # [B, 3, N]
+        pred_input = pred_disp.permute(0, 2, 1) if pred_disp is not None else None
         y_input = introp.permute(0, 2, 1)        # [B, 3, N]
 
 
         # feat_pre = self.encoder(x_input, disp_input)  # [B, d_model, N]
         # feat_int = self.encoder(y_input)              # [B, d_model, N]
-        feat_pre = self.encoder_pre(x_input, disp_input)  # [B, d_model, N]
+        feat_pre = self.encoder_pre(x_input, disp_input, pred_input)  # [B, d_model, N]
         feat_int = self.encoder_int(y_input)              # [B, d_model, N]
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)  # [N, B, d]
 
@@ -76,7 +78,7 @@ class TransformerDDPMRegNet(nn.Module):
             return lambda x_t: self.ddpm(x_t, t_embed, trans_feat)
         else:
             raise NotImplementedError("Use the training loop to predict x0 or sampling loop separately.")
-    def predict_noise_step(self, preop, introp, disp, x_t, t):
+    def predict_noise_step(self, preop, introp, disp, x_t, t, pred_disp=None):
         """Predict noise for a given noisy displacement at timestep ``t``.
 
         This helper recomputes PointNet+Transformer features every call so it can
@@ -86,11 +88,12 @@ class TransformerDDPMRegNet(nn.Module):
         B, N, _ = preop.shape
         x_input = preop.permute(0, 2, 1)
         disp_input = disp.permute(0, 2, 1)
+        pred_input = pred_disp.permute(0, 2, 1) if pred_disp is not None else None
         y_input = introp.permute(0, 2, 1)
 
         # feat_pre = self.encoder(x_input, disp_input)
         # feat_int = self.encoder(y_input)
-        feat_pre = self.encoder_pre(x_input, disp_input)
+        feat_pre = self.encoder_pre(x_input, disp_input, pred_input)
         feat_int = self.encoder_int(y_input)
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)
 
@@ -99,3 +102,4 @@ class TransformerDDPMRegNet(nn.Module):
         t_embed = get_timestep_embedding(t, self.d_model).unsqueeze(1).expand(-1, N, -1)
 
         return self.ddpm(x_t, t_embed, trans_feat)
+    
