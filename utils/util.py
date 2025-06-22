@@ -488,3 +488,22 @@ def get_timestep_embedding(timesteps, embedding_dim):
     emb = timesteps[:, None] * emb[None, :]
     emb = torch.cat([torch.sin(emb), torch.cos(emb)], dim=1)
     return emb  # [B, D]
+
+def get_xyz_positional_encoding(xyz: torch.Tensor, d_pos=18):
+    """
+    xyz: [B, N, 3]
+    return: [B, N, d_pos] sinusoidal positional encoding
+    """
+    device = xyz.device
+    B, N, _ = xyz.shape
+    pe_list = []
+
+    for i in range(3):  # 对 x, y, z 分别做 embedding
+        coord = xyz[:, :, i].unsqueeze(-1)  # [B, N, 1]
+        div_term = torch.exp(torch.arange(0, d_pos // 3, 2, device=device).float() * (-np.log(10000.0) / (d_pos // 3)))
+        pe_sin = torch.sin(coord * div_term)
+        pe_cos = torch.cos(coord * div_term)
+        pe = torch.cat([pe_sin, pe_cos], dim=-1)  # [B, N, d_pos/3]
+        pe_list.append(pe)
+
+    return torch.cat(pe_list, dim=-1)  # [B, N, d_pos]

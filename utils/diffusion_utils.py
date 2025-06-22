@@ -43,8 +43,7 @@ def ddim_sample(model, preop, introp, diffusion, ddim_steps=50, eta=0.0):
 
         #eps_theta = predict_eps_fn(x_t)
         #eps_theta = model.predict_noise_step(preop, introp, x_t, t)
-        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t)
-
+        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t, pred_disp=disp_cur)
 
         # 4. 预测 x0（干净 displacement）
         x0_pred = (x_t - sqrt_one_minus_alpha_bar_t * eps_theta) / sqrt_alpha_bar_t
@@ -161,7 +160,9 @@ def ddim_sample_feedback(model, preop, introp, disp_mean, disp_std, diffusion, d
         sqrt_alpha_bar_t = torch.sqrt(alpha_bar_t)
         sqrt_one_minus_alpha_bar_t = torch.sqrt(1. - alpha_bar_t)
 
-        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t)
+        #eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t)
+        eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t, pred_disp=disp_cur)
+
 
         x0_pred = (x_t - sqrt_one_minus_alpha_bar_t * eps_theta) / sqrt_alpha_bar_t
         x0_pred = torch.clamp(x0_pred, -1., 1.)

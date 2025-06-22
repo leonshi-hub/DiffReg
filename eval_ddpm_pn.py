@@ -1,3 +1,4 @@
+# === 修改后的 eval_ddpm_pn.py ===
 import os
 import torch
 import numpy as np
@@ -6,7 +7,6 @@ from tqdm import tqdm
 
 from models.ddpm_pn import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
-#from utils.diffusion_utils import ddim_sample
 from utils.diffusion_utils import ddim_sample_feedback
 from LiverDataset import LiverDataset
 
@@ -15,13 +15,13 @@ from vtk.util.numpy_support import numpy_to_vtk
 from torch.utils.data import Subset
 
 # === 配置 ===
-CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-06-14_19-08-49/checkpoints/best_model.pth'
+CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-06-20_16-00-38/checkpoints/best_model.pth'
 SAVE_ROOT = './log/liver_ddpm_experiment/eval_vis'
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
 DDIM_STEPS = 50
-MAX_SAMPLES = 20  # 控制评估样本数量
+MAX_SAMPLES = 20
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -47,7 +47,8 @@ def visualize_batch(preop, introp, warped, folder_name, save_dir):
 @torch.no_grad()
 def main():
     print("🚀 加载模型")
-    model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS).to(DEVICE)
+    model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
+
     checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
@@ -55,6 +56,7 @@ def main():
     dataset_all = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
     dataset = Subset(dataset_all, range(min(len(dataset_all), MAX_SAMPLES)))
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+
     diffusion = DiffusionSchedule(T=300, device=DEVICE)
     Path(SAVE_ROOT).mkdir(parents=True, exist_ok=True)
 
@@ -69,8 +71,7 @@ def main():
         disp_mean = disp_mean.view(1, NUM_POINTS, 3)
         disp_std = disp_std.view(1, NUM_POINTS, 3)
 
-        #disp_pred = ddim_sample(model, preop, introp, diffusion, ddim_steps=DDIM_STEPS)
-        #disp_pred = disp_pred * disp_std + disp_mean
+        # === DDIM采样 ===
         disp_pred = ddim_sample_feedback(
             model, preop, introp, disp_mean, disp_std, diffusion, ddim_steps=DDIM_STEPS
         )

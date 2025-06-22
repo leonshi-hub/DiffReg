@@ -14,5 +14,5 @@
 cd /home/shiliyuan/Projects/DiffReg/diffreg_pointnet_trans/
 
 # 直接调用指定环境下的 python
-/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm_pn2.py
+/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm_pn2_posi.py
 
