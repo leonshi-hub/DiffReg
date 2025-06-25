@@ -7,12 +7,12 @@
 #SBATCH --nodes=1
 #SBATCH --gpus=1
 #SBATCH --mem=48G
-#SBATCH --mail-user=648378211@qq.com
+#SBATCH --mail-user=shiliyuandd@gmail.com
 #SBATCH --mail-type=BEGIN,END,FAIL
 
 # 切换到你的项目目录
 cd /home/shiliyuan/Projects/DiffReg/diffreg_pointnet_trans/
 
 # 直接调用指定环境下的 python
-/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm_pn2.py
+/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm2_posi.py
 

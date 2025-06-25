@@ -9,7 +9,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-from models.ddpm_pn import TransformerDDPMRegNet
+from models.ddpm2_pn_posi import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 from utils.util import PC_distance
@@ -54,7 +54,7 @@ def main():
     print(f"✅ 数据样本数: {len(dataset)}")
 
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
-    ckpt = torch.load('./log/liver_ddpm_experiment/2025-06-22_16-54-12/checkpoints/best_model.pth', map_location=DEVICE)
+    ckpt = torch.load('./log/liver_ddpm_experiment/2025-06-24_15-12-24/checkpoints/best_model.pth', map_location=DEVICE)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
 
@@ -109,7 +109,7 @@ def main():
             print([f"{l:.4f}" for l in stepwise_mse])
 
             if SAVE_VTP:
-                save_dir = f"./evalpn2_vtp/{folder}"
+                save_dir = f"./evalddpm2_vtp/{folder}"
                 os.makedirs(save_dir, exist_ok=True)
                 save_vtp_pointcloud(preop, f"{save_dir}/preop.vtp")
                 save_vtp_pointcloud(introp, f"{save_dir}/introp.vtp")

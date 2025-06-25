@@ -16,12 +16,12 @@ from torch.utils.data import Subset
 
 # === 配置 ===
 CHECKPOINT_PATH = 'log/liver_ddpm_experiment/2025-06-20_16-00-38/checkpoints/best_model.pth'
-SAVE_ROOT = './log/liver_ddpm_experiment/eval_vis'
+SAVE_ROOT = './log/liver_ddpm_experiment/eval2_vis'
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
 DDIM_STEPS = 50
-MAX_SAMPLES = 20
+MAX_SAMPLES = 5
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 

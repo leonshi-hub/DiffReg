@@ -20,7 +20,7 @@ BATCH_SIZE = 1
 NUM_EPOCHS = 1
 LR = 1e-3
 NUM_POINTS = 1024
-DIFFUSION_STEPS = 200
+DIFFUSION_STEPS = 300
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 SAVE_VTP = True  # 保存 warped 点云为 .vtp 文件
@@ -54,7 +54,7 @@ def main():
     print(f"✅ 数据样本数: {len(dataset)}")
 
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
-    ckpt = torch.load('./log/liver_ddpm_experiment/2025-06-22_16-54-12/checkpoints/best_model.pth', map_location=DEVICE)
+    ckpt = torch.load('./log/liver_ddpm_experiment/2025-06-20_16-00-38/checkpoints/best_model.pth', map_location=DEVICE)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
 
@@ -109,7 +109,7 @@ def main():
             print([f"{l:.4f}" for l in stepwise_mse])
 
             if SAVE_VTP:
-                save_dir = f"./evalpn2_vtp/{folder}"
+                save_dir = f"./evalpn33_vtp/{folder}"
                 os.makedirs(save_dir, exist_ok=True)
                 save_vtp_pointcloud(preop, f"{save_dir}/preop.vtp")
                 save_vtp_pointcloud(introp, f"{save_dir}/introp.vtp")

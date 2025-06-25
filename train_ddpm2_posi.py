@@ -1,3 +1,4 @@
+# === train_ddpm_pn2_posi.py (更新版本) ===
 import os
 import torch
 import datetime
@@ -8,12 +9,12 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import math
 
-from models.ddpm_pn_posi import TransformerDDPMRegNet
+from models.ddpm2_pn_posi import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 
 # === 配置 ===
-LOG_NAME = 'liver_ddpm_experiment'
+LOG_NAME = 'liver_ddpm2_experiment'
 BATCH_SIZE = 3
 NUM_EPOCHS = 300
 LR = 3e-4
@@ -52,7 +53,7 @@ def main():
         logging.info(msg)
 
     # === 加载数据集 ===
-    log("\U0001F4E6 加载 liver 数据...")
+    log("📦 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
     dataset = Subset(dataset, range(5000))
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
@@ -94,9 +95,11 @@ def main():
                 gt_disp_unnorm = gt_disp * disp_std + disp_mean
                 pred_disp = w * pred_disp_raw + (1 - w) * gt_disp_unnorm
 
+            # === 前向预测噪声 ===
             predict_eps_fn = model(preop, introp, gt_disp, t, pred_disp=pred_disp, return_noise=True)
             pred_eps = predict_eps_fn(x_t)
 
+            # === 计算损失 ===
             loss = F.mse_loss(pred_eps, eps)
             total_loss += loss.item()
 
@@ -107,6 +110,7 @@ def main():
         avg_loss = total_loss / len(dataloader)
         log(f"[Epoch {epoch}] 平均 Loss: {avg_loss:.6f}")
 
+        # === 保存最优模型 ===
         if avg_loss < best_loss:
             best_loss = avg_loss
             save_path = checkpoints_dir / 'best_model.pth'
