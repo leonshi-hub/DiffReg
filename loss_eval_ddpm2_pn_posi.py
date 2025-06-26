@@ -1,57 +1,29 @@
 import os
 import torch
-import datetime
-import logging
-from pathlib import Path
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Subset
 from tqdm import tqdm
-import torch.nn.functional as F
-import math
-import numpy as np
 
-from models.ddpm_pn_posi import TransformerDDPMRegNet  # ✅ 不带位置编码的模型
+from models.ddpm2_pn_posi import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from utils.diffusion_utils import ddim_sample_feedback
 from LiverDataset import LiverDataset
 from utils.util import PC_distance
 
 # === 配置 ===
-LOG_NAME = 'liver_ddpm_experiment'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
 DIFFUSION_STEPS = 200
 DDIM_STEPS = 50
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
-SAVE_VTP = True  # 保存 warped 点云为 .vtp 文件
-
+SAVE_VTP = True
 
 def save_vtp_pointcloud(points: torch.Tensor, save_path: str):
     import pyvista as pv
     pc = points.squeeze(0).cpu().numpy()
     mesh = pv.PolyData(pc)
     mesh.save(save_path)
-
-def save_vtp_arrows(start_points: torch.Tensor, end_points: torch.Tensor, save_path: str):
-    import pyvista as pv
-    start = start_points.squeeze(0).cpu().numpy()
-    end = end_points.squeeze(0).cpu().numpy()
-
-    # 拼接所有点
-    all_points = np.vstack([start, end])
-
-    # 每条线连接 start[i] → end[i]，对应点索引 i → i + N
-    N = start.shape[0]
-    lines = []
-    for i in range(N):
-        lines.extend([2, i, i + N])  # 每条线的格式是 [2, p0, p1]
-
-    # 构建 PolyData
-    poly = pv.PolyData()
-    poly.points = all_points
-    poly.lines = np.array(lines, dtype=np.int32)
-    poly.save(save_path)
-
 
 def chamfer_naive(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     B, N, _ = x.shape
@@ -60,16 +32,16 @@ def chamfer_naive(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     cd_yx = torch.min(dist_mat, dim=1)[0].mean(dim=1)
     return (cd_xy + cd_yx).mean()
 
-
 def main():
     print("📦 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
-    dataset = Subset(dataset, range(5))
+    dataset = Subset(dataset, range(5))  # 可根据需要修改数量
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
     print(f"✅ 数据样本数: {len(dataset)}")
 
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
-    ckpt = torch.load('./log/liver_ddpm_experiment/2025-06-23_19-57-46/checkpoints/best_model.pth', map_location=DEVICE)
+    ckpt_path = 'log/liver_ddpm2_experiment/2025-06-25_18-27-31/checkpoints/best_model.pth'
+    ckpt = torch.load(ckpt_path, map_location=DEVICE)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
 
@@ -90,6 +62,7 @@ def main():
                 t = torch.full((BATCH_SIZE,), t_val, device=DEVICE, dtype=torch.long)
                 x_t, eps = diffusion.add_noise(gt_disp, t)
                 eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t, pred_disp=disp_cur)
+
                 alpha_bar_t = diffusion.alphas_cumprod[t].view(-1, 1, 1)
                 sqrt_alpha_bar = torch.sqrt(alpha_bar_t)
                 sqrt_one_minus_alpha_bar = torch.sqrt(1 - alpha_bar_t)
@@ -102,7 +75,6 @@ def main():
             pred_disp_ddim = ddim_sample_feedback(model, preop, introp, disp_mean, disp_std, diffusion, ddim_steps=DDIM_STEPS, eta=0.0)
             warped_ddim = preop + pred_disp_ddim
 
-            # === 评估指标 ===
             def eval_metrics(warped):
                 rmse = F.mse_loss(warped, introp).sqrt()
                 max_dist = torch.norm(warped - introp, dim=2).max()
@@ -120,15 +92,13 @@ def main():
             print(f"   📏 RMSE: {rmse_ddim.item():.6f}, MAX: {max_ddim.item():.6f}, Chamfer: {chamfer_ddim.item():.6f}, PC_dist: {pc_ddim:.6f}")
 
             if SAVE_VTP:
-                save_dir = f"./eval_vtp_compare_gt_posenc/{folder}"
+                save_dir = f"./eval_vtp_ddpm2/{folder}"
                 os.makedirs(save_dir, exist_ok=True)
                 save_vtp_pointcloud(warped_ddpm, f"{save_dir}/warped_ddpm.vtp")
                 save_vtp_pointcloud(warped_ddim, f"{save_dir}/warped_ddim.vtp")
                 save_vtp_pointcloud(introp, f"{save_dir}/introp.vtp")
                 save_vtp_pointcloud(preop, f"{save_dir}/preop.vtp")
-                save_vtp_arrows(preop, warped_ddpm, f"{save_dir}/ddpm_arrows.vtp")
-                save_vtp_arrows(preop, warped_ddim, f"{save_dir}/ddim_arrows.vtp")
-                print(f"📁 已保存对比 VTP 到 {save_dir}，含箭头形变矢量")
+                print(f"📁 已保存对比 VTP 到 {save_dir}")
 
 if __name__ == '__main__':
     main()

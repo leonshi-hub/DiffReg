@@ -36,7 +36,7 @@ class TransformerDDPMRegNet(nn.Module):
         super().__init__()
 
         # 新增输入通道为 3 + 18
-        self.encoder_pre = PointNetEncoder(channel=21, d_model=d_model, use_disp=True, use_pred_disp=use_pred_disp)
+        self.encoder_pre = PointNetEncoder(channel=21, d_model=d_model, use_disp=False, use_pred_disp=use_pred_disp)
         self.encoder_int = PointNetEncoder(channel=21, d_model=d_model, use_disp=False)
         self.transformer = nn.Transformer(d_model=d_model, num_encoder_layers=4, num_decoder_layers=4)
         self.ddpm = DDPMDeformer(cond_dim=d_model, time_dim=d_model)
@@ -55,7 +55,9 @@ class TransformerDDPMRegNet(nn.Module):
         disp_input = disp.permute(0, 2, 1)
         pred_input = pred_disp.permute(0, 2, 1) if pred_disp is not None else None
 
-        feat_pre = self.encoder_pre(x_input, disp_input, pred_input)  # [B, d_model, N]
+        #feat_pre = self.encoder_pre(x_input, disp_input, pred_input)  # [B, d_model, N]
+        feat_pre = self.encoder_pre(x_input, disp=None, pred_disp=pred_input)
+
         feat_int = self.encoder_int(y_input)              # [B, d_model, N]
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)  # [N, B, d]
 
@@ -80,7 +82,9 @@ class TransformerDDPMRegNet(nn.Module):
         disp_input = disp.permute(0, 2, 1)
         pred_input = pred_disp.permute(0, 2, 1) if pred_disp is not None else None
 
-        feat_pre = self.encoder_pre(x_input, disp_input, pred_input)
+        #feat_pre = self.encoder_pre(x_input, disp_input, pred_input)
+        feat_pre = self.encoder_pre(x_input, disp=None, pred_disp=pred_input)
+
         feat_int = self.encoder_int(y_input)
         feat_pre, feat_int = feat_pre.permute(2, 0, 1), feat_int.permute(2, 0, 1)
 

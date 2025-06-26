@@ -79,6 +79,7 @@ def main():
                 eps_theta = model.predict_noise_step(preop, introp, disp_cur, x_t, t, pred_disp=disp_cur)
                 loss = F.mse_loss(eps_theta, eps)
                 stepwise_mse.append(loss.item())
+                print(f"t={t_val}, mse={loss.item():.4f}")
 
                 alpha_bar_t = diffusion.alphas_cumprod[t].view(-1, 1, 1)
                 sqrt_alpha_bar = torch.sqrt(alpha_bar_t)
