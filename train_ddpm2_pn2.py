@@ -9,12 +9,12 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import math
 
-from models.ddpm2_pn_posi import TransformerDDPMRegNet
+from models.ddpm2_pn2_posi import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 
 # === 配置 ===
-LOG_NAME = 'liver_ddpm2_experiment'
+LOG_NAME = 'liver_ddpm2_pn2_experiment'
 BATCH_SIZE = 5
 NUM_EPOCHS = 600
 LR = 3e-4

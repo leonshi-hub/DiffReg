@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -e err-diffreg-%J.err
 #SBATCH -o out-diffreg-%J.out
-#SBATCH --time=36:00:00
+#SBATCH --time=72:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
@@ -14,5 +14,5 @@
 cd /home/shiliyuan/Projects/DiffReg/diffreg_pointnet_trans/
 
 # 直接调用指定环境下的 python
-/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm_pn2.py
+/mnt/cluster/environments/shiliyuan/miniconda3/envs/devtorch118/bin/python train_ddpm2_pn2.py
 

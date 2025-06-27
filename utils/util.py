@@ -507,3 +507,48 @@ def get_xyz_positional_encoding(xyz: torch.Tensor, d_pos=18):
         pe_list.append(pe)
 
     return torch.cat(pe_list, dim=-1)  # [B, N, d_pos]
+
+class PointNetPPEncoder(nn.Module):
+    def __init__(self, npoint=1024, d_model=128, use_pred_disp=False):
+        super().__init__()
+        self.use_pred_disp = use_pred_disp
+        self.npoint = npoint
+        self.d_model = d_model
+
+        in_channel = 21  # 3D坐标 + 18维位置编码
+        if use_pred_disp:
+            in_channel += 3  # 追加预测形变向量
+
+        self.sa1 = PointNetSetAbstractionMsg(
+            npoint=npoint,
+            radius_list=[0.1, 0.2],
+            nsample_list=[16, 32],
+            in_channel=in_channel,
+            mlp_list=[[32, 64], [64, 128]]
+        )
+        self.fc = nn.Sequential(
+            nn.Conv1d(64 + 128, d_model, 1),
+            nn.BatchNorm1d(d_model),
+            nn.ReLU()
+        )
+
+    def forward(self, x, disp=None, pred_disp=None):
+        """
+        Args:
+            x: [B, 21, N] = 原始点 + 位置编码
+            disp: 不再使用（保留参数兼容）
+            pred_disp: [B, 3, N] 可选预测位移
+        Returns:
+            [B, d_model, N] 特征编码
+        """
+        B, _, N = x.shape
+        xyz_coords = x[:, :3, :]  # 提取坐标作为分组中心
+
+        if self.use_pred_disp:
+            if pred_disp is None:
+                raise ValueError("pred_disp is required when use_pred_disp=True")
+            x = torch.cat([x, pred_disp], dim=1)
+
+        _, new_feat = self.sa1(xyz_coords, x)  # new_feat: [B, C, N]
+        return self.fc(new_feat)  # 输出维度：[B, d_model, N]
+
