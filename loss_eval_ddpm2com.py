@@ -16,8 +16,8 @@ from utils.util import PC_distance
 LOG_NAME = 'liver_ddpm2_experiment'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
-DIFFUSION_STEPS = 200
-DDIM_STEPS = 50
+DIFFUSION_STEPS = 1200
+DDIM_STEPS = 500
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 SAVE_VTP = True
@@ -63,7 +63,7 @@ def main():
 
     # === 模型加载 ===
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
-    ckpt = torch.load('log/liver_ddpm2_experiment/2025-06-26_14-57-08/checkpoints/best_model.pth', map_location=DEVICE)
+    ckpt = torch.load('log/liver_ddpm2_experiment/2025-06-27_12-15-39/checkpoints/best_model.pth', map_location=DEVICE)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
 
