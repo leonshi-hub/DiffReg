@@ -13,8 +13,8 @@ from models.ddpm2_pn2_posi import TransformerDDPMRegNet
 from utils.ddpm_schedule import DiffusionSchedule
 from LiverDataset import LiverDataset
 
-LOG_NAME = 'liver_ddpm2_pn2_loss3_chain'
-BATCH_SIZE = 5
+LOG_NAME = 'liver_ddpm2_pn2_loss3_chain_pre'
+BATCH_SIZE = 3
 NUM_EPOCHS = 600
 LR = 1e-4
 NUM_POINTS = 1024
@@ -23,6 +23,25 @@ CHAIN_STEPS = 5            # 控制链式步数
 PER_STEP_BACKWARD = False     # 控制是否每一步都做 backward
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh'
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_pretrained_modules(model, pretrain_path, device='cuda'):
+    print(f"📂 加载预训练权重文件：")
+    pretrain_state = torch.load(pretrain_path, map_location=device)
+
+    for submodule_name in ['encoder_pre', 'encoder_int', 'transformer']:
+        if hasattr(model, submodule_name):
+            submodule = getattr(model, submodule_name)
+            prefix = f"{submodule_name}."
+            filtered_state = {
+                k.replace(prefix, ""): v
+                for k, v in pretrain_state.items()
+                if k.startswith(prefix)
+            }
+            missing_keys, unexpected_keys = submodule.load_state_dict(filtered_state, strict=False)
+            print(f"✅ {submodule_name} 加载成功（{len(filtered_state)}参数）")
+            if missing_keys:
+                print(f"⚠️ 缺失 key: {missing_keys}")
+            if unexpected_keys:
+                print(f"⚠️ 多余 key: {unexpected_keys}")
 
 def get_lr(epoch, warmup_epochs, total_epochs, base_lr, min_lr):
     if epoch < warmup_epochs:
@@ -59,6 +78,10 @@ def main():
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
 
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
+    load_pretrained_modules(model, 'pretrain_ckpt/pretrain_pointnetpp_transformer_2025-07-09_13-58-33/best_model.pth', device=DEVICE)
+
+    print(f"✅ 已加载预训练 encoder 权重")
+   
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     diffusion = DiffusionSchedule(T=DIFFUSION_STEPS, device=DEVICE)
     best_loss = float('inf')

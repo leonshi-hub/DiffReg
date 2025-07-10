@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -e err-diffreg-%J.err
 #SBATCH -o out-diffreg-%J.out
-#SBATCH --time=72:00:00
+#SBATCH --time=144:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --ntasks=1
 #SBATCH --nodes=1

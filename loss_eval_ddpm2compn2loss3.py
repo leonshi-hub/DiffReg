@@ -16,7 +16,7 @@ from utils.util import PC_distance
 LOG_NAME = 'liver_ddpm2_pn2_experiment'
 BATCH_SIZE = 1
 NUM_POINTS = 1024
-DIFFUSION_STEPS = 1200
+DIFFUSION_STEPS = 2000
 DDIM_STEPS = 500
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DATA_ROOT = '/mnt/cluster/workspaces/pfeiffemi/V2SData/NewPipeline/100k_nh_2'
@@ -57,13 +57,13 @@ def chamfer_naive(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 def main():
     print("📦 加载 liver 数据...")
     dataset = LiverDataset(DATA_ROOT, num_points=NUM_POINTS, preload=False)
-    dataset = Subset(dataset, range(5))
+    dataset = Subset(dataset, range(10))
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, drop_last=False)
     print(f"✅ 数据样本数: {len(dataset)}")
 
     # === 模型加载 ===
     model = TransformerDDPMRegNet(d_model=128, npoint=NUM_POINTS, use_pred_disp=True).to(DEVICE)
-    ckpt = torch.load('log/liver_ddpm2_pn2_loss3_experiment/2025-06-30_15-40-02/checkpoints/best_model.pth', map_location=DEVICE)
+    ckpt = torch.load('log/liver_ddpm2_pn2_loss3_experiment/2025-07-02_19-53-59/checkpoints/best_model.pth', map_location=DEVICE)
     model.load_state_dict(ckpt['model_state_dict'])
     model.eval()
 

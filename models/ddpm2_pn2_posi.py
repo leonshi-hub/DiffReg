@@ -38,7 +38,7 @@ class TransformerDDPMRegNet(nn.Module):
         # 新增输入通道为 3 + 18
         self.encoder_pre = PointNetPPEncoder(npoint=1024, d_model=128, use_pred_disp=True)
         self.encoder_int = PointNetPPEncoder(npoint=1024, d_model=128, use_pred_disp=False)
-        self.transformer = nn.Transformer(d_model=d_model, num_encoder_layers=2, num_decoder_layers=2)
+        self.transformer = nn.Transformer(d_model=d_model, num_encoder_layers=4, num_decoder_layers=4)
         self.ddpm = DDPMDeformer(cond_dim=d_model, time_dim=d_model)
 
         self.npoint = npoint
